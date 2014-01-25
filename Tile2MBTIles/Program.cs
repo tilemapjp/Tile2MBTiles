@@ -8,29 +8,61 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Reflection;
 
-
+using CommandLine;
 
 namespace Tile2MBTIles
 {
 	class MainClass
 	{
-		private static string path = "";
+		enum MBTilesErrorType {
+			BAD_ARGUMENT = 1,
+			NONEXIST_PATH,
+			EXIST_OUTPUT,
+			CANNOT_CREATE
+		};
+
+		static Dictionary<MBTilesErrorType,string> ErrorMessage = new Dictionary<MBTilesErrorType,string>(){
+			{MBTilesErrorType.BAD_ARGUMENT,       "コマンドライン引数の解析に失敗。"},
+			{MBTilesErrorType.NONEXIST_PATH,      "探索パスが存在しません。"},
+			{MBTilesErrorType.EXIST_OUTPUT,       "出力ファイルが既に存在します。"},
+			{MBTilesErrorType.CANNOT_CREATE,      "出力ファイルが作成できません。"}
+		};
 
 		public static void Main (string[] args)
 		{
-			try {
-				//パス取得（カレントパス）
-#if DEBUG
-				path = args[0];
-#else
-				var assemble = Assembly.GetEntryAssembly();
-				path = Path.GetDirectoryName (assemble.Location) + "/";
-#endif
+			var opts = new Options();
+			bool isSuccess = CommandLine.Parser.Default.ParseArguments(args, opts);
+			if (!isSuccess)
+				HandleError (MBTilesErrorType.BAD_ARGUMENT);
 
+			if (opts.help) {
+				Console.WriteLine ("Tile2MBTiles.exe [-f fromProjText|-g fromepsgCode] [-t toProjText|-u toEpsgCode] [-o outputFile] inputFile");
+				Environment.Exit(0);
+			} 
+
+			try {
+				var searchPath = opts.searcnPath;
+				//パス取得（カレントパス）
+				if (searchPath == null) {
+					var assemble = Assembly.GetEntryAssembly();
+					searchPath = Path.GetDirectoryName (assemble.Location) + "/";
+				}
+				if (!Directory.Exists(searchPath))
+					HandleError(MBTilesErrorType.NONEXIST_PATH);
+					
+				var outputFile = opts.outputFile;
 				//DB名の生成とコネクション文字列生成
-				var mbtiles = path + "map.mbtiles";
-				File.Create (mbtiles).Close();
-				var conString = "URI=" + new System.Uri(mbtiles).AbsoluteUri;
+				if (outputFile == null) {
+					outputFile = searchPath + "map.mbtiles";
+				}
+				if (File.Exists(outputFile))
+					HandleError(MBTilesErrorType.EXIST_OUTPUT);
+
+				var ws = File.Create (outputFile);
+				if (ws == null) 
+					HandleError(MBTilesErrorType.CANNOT_CREATE);
+				ws.Close();
+				var conString = "URI=" + new System.Uri(outputFile).AbsoluteUri;
 
 				using (var conn = new SqliteConnection(conString)) {
 					//スキーマ作成
@@ -69,7 +101,7 @@ namespace Tile2MBTIles
 
 					//タイル画像検索
 					var files = GetFiles(
-						path, // 検索開始ディレクトリ
+						searchPath, // 検索開始ディレクトリ
 						@"[0-9]+/[0-9]+/[0-9]+\.(png|jpe?g)$", // 検索パターン
 						SearchOption.AllDirectories); // サブ・ディレクトリ含めない
 
@@ -121,8 +153,16 @@ namespace Tile2MBTIles
 					conn.Close();
 				}
 			} catch (Exception ex) {
-				throw ex;
+				Console.Write ("エラー: ");
+				Console.WriteLine (ex.Message);
+				Environment.Exit (1);
 			}
+		}
+
+		private static void HandleError (MBTilesErrorType errType) {
+			Console.Write ("エラー: ");
+			Console.WriteLine (ErrorMessage [errType]);
+			Environment.Exit (1);
 		}
 
 		//Regex version
@@ -144,6 +184,29 @@ namespace Tile2MBTIles
 			return searchPatterns.AsParallel()
 					.SelectMany(searchPattern => 
 						Directory.EnumerateFiles(path, searchPattern, searchOption));
+		}
+	}
+
+	class Options {
+		[CommandLine.Option('p',"path", DefaultValue=null)]
+		public string searcnPath
+		{
+			get;
+			set;
+		}
+
+		[CommandLine.Option('o',"output", DefaultValue=null)]
+		public string outputFile
+		{
+			get;
+			set;
+		}
+
+		[CommandLine.Option('h',"help", DefaultValue=false)]
+		public bool help
+		{
+			get;
+			set;
 		}
 	}
 }
