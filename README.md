@@ -1,4 +1,47 @@
 Tile2MBTiles
 ============
 
-Create new mbtiles file from existing tile directory
+既にタイルを作ってしまったディレクトリから、タイル画像を読み込んでMBTilesを作成します。
+
+機能
+----
+
+既にタイルを作ってしまったディレクトリから、タイル画像を読み込んでMBTilesを作成します。  
+[MBTiles](https://www.mapbox.com/developers/mbtiles/)が判らない人には多分不要の代物です。
+
+MapTilerで生成できるじゃんとか言わない。  
+既に先に作ってしまったタイルデータがあって、後からMBTilesが欲しくなった時とかに地味に便利。
+
+使い方
+------
+
+Mac OS X /w Monoの場合
+
+```
+mono Tile2MBTiles.exe [-p searchPath] [-o outputFile]
+```
+
+Windowsで動くかは未確認。
+
+* -p オプション
+
+タイルを探しにいくディレクトリです。  
+この配下の、{z}/{x}/{y}.(?:png|jpe?g)$な画像を探しにいきます。
+
+無指定の場合は、実行しているカレントディレクトリを探します。
+
+* -o オプション
+
+蓄積結果のMBTilesをファイルに出力します。  
+無指定の場合は、画像タイルを探しているパスの下に、map.mbtilesというファイルを作成します。
+
+今後
+----
+
+今のところ、画像しか読み込みませんが、gdal xmlやTileJSONを読んでメタデータを埋めたり、UTFGridにも対応したりするかもしれません。  
+が、メタデータはともかく、UTFGridは作者があまり興味がない&あまり使ってないので期待薄かも。
+
+ライセンス
+----------
+
+MIT
